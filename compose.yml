@@ -1,8 +1,10 @@
 services:
+  # シグナリングサーバー
   signaling_server:
     build:
-      context: .
-      dockerfile: packages/signaling-server/Dockerfile
+      context: . # ビルドコンテキストをルートディレクトリに設定
+      dockerfile: Dockerfile # ルートのDockerfileを指定
+      target: signaling_server_build # ビルドするターゲットステージ名を指定
     ports:
       - "3000:3000"
     environment:
@@ -12,10 +14,12 @@ services:
       - turn_server
     restart: always
 
+  # Mediasoup Workerサーバー
   mediasoup_worker:
     build:
-      context: .
-      dockerfile: packages/mediasoup-worker/Dockerfile
+      context: . # ビルドコンテキストをルートディレクトリに設定
+      dockerfile: Dockerfile # ルートのDockerfileを指定
+      target: mediasoup_worker_build # ビルドするターゲットステージ名を指定
     ports:
       - "4000:4000"
       - "40000-40010:40000-40010/udp"
@@ -26,10 +30,10 @@ services:
       - TURN_SERVER_PASS=turnpassword
     restart: always
 
+  # TURNサーバー (この部分は変更なし)
   turn_server:
     image: coturn/coturn:4.6
     volumes:
       - ./turn/turnserver.conf:/etc/coturn/turnserver.conf
-    # network_mode: host が最も簡単な設定
     network_mode: "host"
     restart: always
