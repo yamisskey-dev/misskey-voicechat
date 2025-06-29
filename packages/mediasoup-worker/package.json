@@ -1,0 +1,9 @@
+{
+  "name": "mediasoup-worker",
+  "version": "1.0.0",
+  "main": "worker.js",
+  "dependencies": {
+    "mediasoup": "^3.14.3",
+    "ws": "^8.17.1"
+  }
+}

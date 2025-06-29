@@ -1,0 +1,9 @@
+{
+  "name": "signaling-server",
+  "version": "1.0.0",
+  "main": "server.js",
+  "dependencies": {
+    "uuid": "^9.0.1",
+    "ws": "^8.17.1"
+  }
+}

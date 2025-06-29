@@ -1,0 +1,35 @@
+services:
+  signaling_server:
+    build:
+      context: .
+      dockerfile: packages/signaling-server/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - MEDIASOUP_WORKER_URL=ws://mediasoup_worker:4000
+    depends_on:
+      - mediasoup_worker
+      - turn_server
+    restart: always
+
+  mediasoup_worker:
+    build:
+      context: .
+      dockerfile: packages/mediasoup-worker/Dockerfile
+    ports:
+      - "4000:4000"
+      - "40000-40010:40000-40010/udp"
+    environment:
+      - MEDIASOUP_ANNOUNCED_IP=127.0.0.1
+      - TURN_SERVER_URL=turn_server:3478
+      - TURN_SERVER_USER=misskey
+      - TURN_SERVER_PASS=turnpassword
+    restart: always
+
+  turn_server:
+    image: coturn/coturn:4.6
+    volumes:
+      - ./turn/turnserver.conf:/etc/coturn/turnserver.conf
+    # network_mode: host が最も簡単な設定
+    network_mode: "host"
+    restart: always
