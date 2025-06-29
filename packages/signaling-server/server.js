@@ -1,5 +1,6 @@
 const http = require('http');
 const WebSocket = require('ws');
+const Redis = require('ioredis');
 const { v4: uuidv4 } = require('uuid');
 
 const PORT = 3000;
@@ -13,6 +14,24 @@ class VoiceCallService {
         this.pendingRequests = new Map();
         this.rooms = new Map();
         this.peers = new Map();
+        this.connectToWorker();
+
+        const redisUrl = process.env.REDIS_URL;
+
+        if (!redisUrl) {
+            console.error('FATAL: REDIS_URL environment variable is not set. Please check your docker-compose.yml.');
+            process.exit(1);
+        }
+
+        console.log(`Connecting to Redis at ${redisUrl}...`);
+        this.redis = new Redis(redisUrl);
+        this.redis.on('connect', () => {
+            console.log('Connected to Redis');
+        });
+        this.redis.on('error', (err) => {
+            console.error('Redis connection error:', err);
+        });
+
         this.connectToWorker();
     }
 
@@ -76,7 +95,6 @@ class VoiceCallService {
         }
     }
     
-    // ルーム内の指定したクライアント以外にブロードキャスト
     _broadcast(room, excludeClientId, type, payload) {
         for (const peer of room.peers.values()) {
             if (peer.id !== excludeClientId) {
@@ -85,19 +103,16 @@ class VoiceCallService {
         }
     }
 
-    // クライアントからのWebSocket接続を処理
     handleNewPeer(client, userId) {
         console.log(`Peer connected: ${userId}`);
         this.peers.set(client, { id: userId });
     }
 
-    // クライアントの切断を処理
     handlePeerDisconnect(client) {
         const peerInfo = this.peers.get(client);
         if (!peerInfo) return;
         
         console.log(`Peer disconnected: ${peerInfo.id}`);
-        // ルームからピアを退出させるなどのクリーンアップ処理
         for (const room of this.rooms.values()) {
             const peerInRoom = room.peers.get(peerInfo.id);
             if (peerInRoom) {
@@ -109,8 +124,7 @@ class VoiceCallService {
         }
         this.peers.delete(client);
     }
-    
-    // クライアントからのメッセージを処理
+
     async handleMessage(client, message) {
         const peerInfo = this.peers.get(client);
         if (!peerInfo) return;
@@ -136,6 +150,30 @@ class VoiceCallService {
 
                     room.peers.set(peerId, { id: peerId, client, transports: new Map(), producers: new Map(), consumers: new Map() });
                     this._send(client, 'joined', { existingProducers });
+                    break;
+                }
+
+                case 'getRoomKey': {
+                    const { roomId } = payload;
+                    const redisKey = `roomkey:${roomId}`;
+                    const storedKeyJson = await this.redis.get(redisKey);
+
+                    let keyToExport;
+
+                    if (storedKeyJson) {
+                        keyToExport = JSON.parse(storedKeyJson);
+                        console.log(`Key for room ${roomId} retrieved from Redis`);
+                    } else {
+                        const keyData = crypto.getRandomValues(new Uint8Array(32));
+                        const newKey = await crypto.subtle.importKey(
+                            "raw", keyData, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]
+                        );
+                        keyToExport = await crypto.subtle.exportKey("jwk", newKey);
+
+                        await this.redis.set(redisKey, JSON.stringify(keyToExport), 'EX', 3600);
+                        console.log(`New key for room ${roomId} generated and stored in Redis (TTL: 1 hour)`);
+                    }
+                    this._send(client, 'roomKey', { key: keyToExport });
                     break;
                 }
 
@@ -186,14 +224,12 @@ class VoiceCallService {
     }
 }
 
-
-// --- サーバーの起動 ---
 const server = http.createServer();
 const wss = new WebSocket.Server({ server });
 const voiceCallService = new VoiceCallService();
 
 wss.on('connection', (ws) => {
-    // 実際のMisskey実装では、ここで認証を行いユーザーIDを特定する
+    // Misskeyでは、ここで認証を行いユーザーIDを特定する
     const tempUserId = `user-${uuidv4()}`;
     voiceCallService.handleNewPeer(ws, tempUserId);
 
