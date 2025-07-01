@@ -43,9 +43,6 @@ services:
     command: redis-server --save 60 1 --loglevel warning
     volumes:
       - redis_data:/data
-    sysctls:
-      - net.core.somaxconn=1024
-      - vm.overcommit_memory=1
     restart: always
 
 volumes:

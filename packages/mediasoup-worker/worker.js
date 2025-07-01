@@ -5,14 +5,12 @@ const PORT = 4000;
 
 console.log('--- Mediasoup Worker Server ---');
 
-// --- 環境変数から設定を読み込む ---
-// Docker Composeから渡される。ローカルデバッグ用のデフォルト値も設定。
+// --- 環境変数 ---
 const ANNOUNCED_IP = process.env.MEDIASOUP_ANNOUNCED_IP || '127.0.0.1';
-const TURN_URL = process.env.TURN_SERVER_URL; // 例: 'turn_server:3478'
-const TURN_USER = process.env.TURN_SERVER_USER; // 例: 'misskey'
-const TURN_PASS = process.env.TURN_SERVER_PASS; // 例: 'turnpassword'
+const TURN_URL = process.env.TURN_SERVER_URL;
+const TURN_USER = process.env.TURN_SERVER_USER;
+const TURN_PASS = process.env.TURN_SERVER_PASS;
 
-// --- グローバル変数 ---
 let worker;
 const routers = new Map();
 const transports = new Map();
