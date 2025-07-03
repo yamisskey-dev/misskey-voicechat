@@ -1,18 +1,11 @@
 services:
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    command: tunnel --no-autoupdate run --token YOUR_COPIED_TUNNEL_TOKEN
-    depends_on:
-      - signaling_server
-    restart: always
-
   signaling_server:
     build:
       context: .
       dockerfile: Dockerfile
       target: signaling_server_build
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
       - MEDIASOUP_WORKER_URL=ws://mediasoup_worker:4000
       - REDIS_URL=redis://redis:6379
