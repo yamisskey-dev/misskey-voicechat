@@ -138,11 +138,8 @@ class VoiceCallService {
 
 
     async handleMessage(client, message) {
-        const peerInfo = this.peers.get(client);
-        if (!peerInfo) return;
-        const peerId = peerInfo.id;
-
         const { type, payload } = message;
+        const peerId = user.id;
 
         try {
             switch (type) {
