@@ -125,6 +125,18 @@ class VoiceCallService {
         this.peers.delete(client);
     }
 
+    async _getOrCreateRoom(roomId) {
+        let room = this.rooms.get(roomId);
+        if (!room) {
+            const routerInfo = await this._requestWorker('createRouter', {});
+            const router = { id: routerInfo.id, rtpCapabilities: routerInfo.rtpCapabilities };
+            room = { id: roomId, router, peers: new Map() };
+            this.rooms.set(roomId, room);
+        }
+        return room;
+    }
+
+
     async handleMessage(client, message) {
         const peerInfo = this.peers.get(client);
         if (!peerInfo) return;
@@ -134,21 +146,32 @@ class VoiceCallService {
 
         try {
             switch (type) {
+                case 'getRouterRtpCapabilities': {
+                    const { roomId } = payload;
+                    const room = await this._getOrCreateRoom(roomId);
+                    this._send(client, 'routerRtpCapabilities', room.router.rtpCapabilities);
+                    break;
+                }
+                
                 case 'joinRoom': {
                     const { roomId } = payload;
-                    let room = this.rooms.get(roomId);
-                    if (!room) {
-                        const routerInfo = await this._requestWorker('createRouter', {});
-                        room = { id: roomId, routerId: routerInfo.id, peers: new Map() };
-                        this.rooms.set(roomId, room);
-                    }
-                    
+                    const room = await this._getOrCreateRoom(roomId);
+                
+                    // ピアをルームに追加 (既存のロジック)
+                    const peer = { id: peerId, client, transports: new Map(), producers: new Map(), consumers: new Map() };
+                    room.peers.set(peerId, peer);
+
+                    // 既存のProducerがいれば、その情報を新しい参加者に通知 
                     const existingProducers = [];
                     for (const otherPeer of room.peers.values()) {
-                       otherPeer.producers.forEach(p => existingProducers.push({ producerId: p.id, peerId: otherPeer.id }));
+                        if (otherPeer.id !== peerId) {
+                            for (const producer of otherPeer.producers.values()) {
+                                existingProducers.push({ producerId: producer.id, peerId: otherPeer.id });
+                            }
+                        }
                     }
-
-                    room.peers.set(peerId, { id: peerId, client, transports: new Map(), producers: new Map(), consumers: new Map() });
+                
+                    // 参加完了と、既存Producerの情報をクライアントに送信
                     this._send(client, 'joined', { existingProducers });
                     break;
                 }
