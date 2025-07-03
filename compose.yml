@@ -1,4 +1,11 @@
 services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run --token YOUR_COPIED_TUNNEL_TOKEN
+    depends_on:
+      - signaling_server
+    restart: always
+
   signaling_server:
     build:
       context: .
